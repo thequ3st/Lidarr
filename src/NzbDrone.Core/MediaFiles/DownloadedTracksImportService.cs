@@ -22,6 +22,7 @@ namespace NzbDrone.Core.MediaFiles
     {
         List<ImportResult> ProcessRootFolder(IDirectoryInfo directoryInfo);
         List<ImportResult> ProcessPath(string path, ImportMode importMode = ImportMode.Auto, Artist artist = null, DownloadClientItem downloadClientItem = null);
+        List<ImportResult> ProcessPath(string path, ImportMode importMode, Artist artist, DownloadClientItem downloadClientItem, List<Album> albums);
         bool ShouldDeleteFolder(IDirectoryInfo directoryInfo, Artist artist);
     }
 
@@ -102,6 +103,28 @@ namespace NzbDrone.Core.MediaFiles
                     return ProcessFile(fileInfo, importMode, downloadClientItem);
                 }
 
+                return ProcessFile(fileInfo, importMode, artist, downloadClientItem);
+            }
+
+            LogInaccessiblePathError(path);
+            _eventAggregator.PublishEvent(new TrackImportFailedEvent(null, null, true, downloadClientItem));
+
+            return new List<ImportResult>();
+        }
+
+        public List<ImportResult> ProcessPath(string path, ImportMode importMode, Artist artist, DownloadClientItem downloadClientItem, List<Album> albums)
+        {
+            _logger.Debug("Processing path with album override: {0}", path);
+
+            if (_diskProvider.FolderExists(path))
+            {
+                var directoryInfo = _diskProvider.GetDirectoryInfo(path);
+                return ProcessFolder(directoryInfo, importMode, artist, downloadClientItem, albums);
+            }
+
+            if (_diskProvider.FileExists(path))
+            {
+                var fileInfo = _diskProvider.GetFileInfo(path);
                 return ProcessFile(fileInfo, importMode, artist, downloadClientItem);
             }
 
@@ -205,6 +228,93 @@ namespace NzbDrone.Core.MediaFiles
             {
                 Artist = artist
             };
+            var idInfo = new ImportDecisionMakerInfo
+            {
+                DownloadClientItem = downloadClientItem,
+                ParsedAlbumInfo = folderInfo
+            };
+            var idConfig = new ImportDecisionMakerConfig
+            {
+                Filter = FilterFilesType.None,
+                NewDownload = true,
+                SingleRelease = false,
+                IncludeExisting = false,
+                AddNewArtists = false
+            };
+
+            var decisions = _importDecisionMaker.GetImportDecisions(audioFiles, idOverrides, idInfo, idConfig);
+            var importResults = _importApprovedTracks.Import(decisions, true, downloadClientItem, importMode);
+
+            if (importMode == ImportMode.Auto)
+            {
+                importMode = (downloadClientItem == null || downloadClientItem.CanMoveFiles) ? ImportMode.Move : ImportMode.Copy;
+            }
+
+            if (importMode == ImportMode.Move &&
+                importResults.Any(i => i.Result == ImportResultType.Imported) &&
+                ShouldDeleteFolder(directoryInfo, artist))
+            {
+                _logger.Debug("Deleting folder after importing valid files");
+
+                try
+                {
+                    _diskProvider.DeleteFolder(directoryInfo.FullName, true);
+                }
+                catch (IOException e)
+                {
+                    _logger.Debug(e, "Unable to delete folder after importing: {0}", e.Message);
+                }
+            }
+            else if (importResults.Empty())
+            {
+                importResults.AddIfNotNull(CheckEmptyResultForIssue(directoryInfo.FullName));
+            }
+
+            return importResults;
+        }
+
+        private List<ImportResult> ProcessFolder(IDirectoryInfo directoryInfo, ImportMode importMode, Artist artist, DownloadClientItem downloadClientItem, List<Album> albums)
+        {
+            if (_artistService.ArtistPathExists(directoryInfo.FullName))
+            {
+                _logger.Warn("Unable to process folder that is mapped to an existing artist");
+                return new List<ImportResult>
+                {
+                    RejectionResult("Import path is mapped to an artist folder")
+                };
+            }
+
+            var folderInfo = Parser.Parser.ParseAlbumTitle(directoryInfo.Name);
+
+            var audioFiles = _diskScanService.FilterFiles(directoryInfo.FullName, _diskScanService.GetAudioFiles(directoryInfo.FullName));
+
+            if (downloadClientItem == null)
+            {
+                foreach (var audioFile in audioFiles)
+                {
+                    if (_diskProvider.IsFileLocked(audioFile.FullName))
+                    {
+                        return new List<ImportResult>
+                               {
+                                   FileIsLockedResult(audioFile.FullName)
+                               };
+                    }
+                }
+            }
+
+            // Use album override from grab history when available
+            var album = albums?.FirstOrDefault();
+            var idOverrides = new IdentificationOverrides
+            {
+                Artist = artist,
+                Album = album
+            };
+
+            if (album != null)
+            {
+                _logger.Info("Using grab history album override: {0} - {1}", artist?.Name, album.Title);
+            }
+
             var idInfo = new ImportDecisionMakerInfo
             {
                 DownloadClientItem = downloadClientItem,

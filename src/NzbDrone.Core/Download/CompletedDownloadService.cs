@@ -106,6 +106,7 @@ namespace NzbDrone.Core.Download
         public void Import(TrackedDownload trackedDownload)
         {
             SetImportItem(trackedDownload);
+            _logger.Info("[Qu3st] Processing import for {0}", trackedDownload.DownloadItem.Title);
 
             if (!ValidatePath(trackedDownload))
             {
@@ -123,7 +124,7 @@ namespace NzbDrone.Core.Download
             trackedDownload.State = TrackedDownloadState.Importing;
 
             var outputPath = trackedDownload.ImportItem.OutputPath.FullPath;
-            var importResults = _downloadedTracksImportService.ProcessPath(outputPath, ImportMode.Auto, trackedDownload.RemoteAlbum.Artist, trackedDownload.ImportItem);
+            var importResults = _downloadedTracksImportService.ProcessPath(outputPath, ImportMode.Auto, trackedDownload.RemoteAlbum.Artist, trackedDownload.ImportItem, trackedDownload.RemoteAlbum?.Albums);
 
             if (VerifyImport(trackedDownload, importResults))
             {
