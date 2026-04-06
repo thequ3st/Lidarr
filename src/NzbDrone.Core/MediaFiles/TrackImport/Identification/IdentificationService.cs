@@ -280,6 +280,13 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Identification
 
             localAlbumRelease.PopulateMatch();
 
+            // Mark as trusted when album was provided from grab history
+            if (idOverrides?.Album != null)
+            {
+                localAlbumRelease.TrustedMatch = true;
+                _logger.Info("[Qu3st] Trusted match from grab history: {0}", idOverrides.Album.Title);
+            }
+
             _logger.Debug($"IdentifyRelease done in {watch.ElapsedMilliseconds}ms");
         }
 

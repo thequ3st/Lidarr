@@ -35,6 +35,7 @@ namespace NzbDrone.Core.Parser.Model
         public AlbumRelease AlbumRelease { get; set; }
         public List<LocalTrack> ExistingTracks { get; set; }
         public bool NewDownload { get; set; }
+        public bool TrustedMatch { get; set; }
 
         public void PopulateMatch()
         {

@@ -20,6 +20,14 @@ namespace NzbDrone.Core.MediaFiles.TrackImport.Specifications
 
         public Decision IsSatisfiedBy(LocalAlbumRelease item, DownloadClientItem downloadClientItem)
         {
+            // [Qu3st] Skip distance check for trusted matches from grab history
+            if (item.TrustedMatch)
+            {
+                var trustedDist = item.Distance.NormalizedDistance();
+                _logger.Debug($"[Qu3st] Trusted match, bypassing distance threshold: {1 - trustedDist:P1} {item.Distance.Reasons}");
+                return Decision.Accept();
+            }
+
             double dist;
             string reasons;
 

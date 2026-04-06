@@ -1,0 +1,64 @@
+# Lidarr Qu3st Edition - Multi-stage Docker build
+# Strategy: publish just the Host project directly, bypassing the solution-level
+# PublishAllRids target that requires frontend build artifacts
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
+
+WORKDIR /build
+
+# Copy everything needed for restore + build
+COPY src/NuGet.config src/
+COPY src/ src/
+COPY Logo/ Logo/
+
+# Publish just the NzbDrone.Host project (the actual Lidarr executable)
+# Use Platform=Posix to exclude Windows, target net8.0 + linux-musl-x64
+# Publish Console (main entry point) and Mono (Linux platform support) to same output
+RUN dotnet publish src/NzbDrone.Console/Lidarr.Console.csproj \
+    -c Release \
+    -f net8.0 \
+    -r linux-musl-x64 \
+    --self-contained \
+    -o /app \
+    -p:TreatWarningsAsErrors=false \
+    -p:AnalysisLevel=none && \
+    dotnet publish src/NzbDrone.Mono/Lidarr.Mono.csproj \
+    -c Release \
+    -f net8.0 \
+    -r linux-musl-x64 \
+    --no-self-contained \
+    -o /app \
+    -p:TreatWarningsAsErrors=false \
+    -p:AnalysisLevel=none
+
+# Pull the stock Lidarr to grab the frontend UI files
+FROM lscr.io/linuxserver/lidarr:latest AS stock
+# Frontend lives at /app/bin/UI
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-alpine
+
+RUN apk add --no-cache \
+    icu-libs \
+    sqlite-libs \
+    mediainfo \
+    chromaprint \
+    su-exec && \
+    addgroup -g 1000 lidarr && \
+    adduser -u 1000 -G lidarr -D -h /app lidarr
+
+WORKDIR /app
+COPY --from=build --chown=1000:1000 /app .
+# Copy frontend UI from stock Lidarr
+COPY --from=stock --chown=1000:1000 /app/lidarr/bin/UI /app/UI
+
+ENV LIDARR_BRANCH=develop
+ENV LIDARR_INSTANCE_NAME="Lidarr [Qu3st]"
+
+EXPOSE 8686
+VOLUME ["/config"]
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8686/ || exit 1
+
+ENTRYPOINT ["su-exec", "lidarr", "./Lidarr", "-nobrowser", "-data=/config"]
