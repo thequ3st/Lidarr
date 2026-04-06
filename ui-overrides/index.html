@@ -2,14 +2,6 @@
         urlBase: '__URL_BASE__'
       };</script><script src="/index-5223705dc654d7fa297b.js" data-no-hash></script><link href="/Content/styles.css" rel="stylesheet"><title>Lidarr [Qu3st]</title><style>
       /* Qu3st Edition branding */
-      :root {
-        --quest-accent: #8B5CF6;
-        --quest-accent-dim: #6D28D9;
-        --quest-glow: rgba(139, 92, 246, 0.15);
-      }
-
-      /* Subtle glow on sidebar */
-      .sidebar { border-right: 2px solid var(--quest-accent) !important; }
 
       /* Branded badge in bottom-left */
       body::after {
@@ -22,10 +14,30 @@
         font-weight: 500;
         letter-spacing: 1.5px;
         text-transform: uppercase;
-        color: var(--quest-accent);
-        opacity: 0.5;
+        color: rgba(255, 255, 255, 0.35);
         pointer-events: none;
         z-index: 9999;
+      }
+
+      /* Scattered question marks across the page toolbar */
+      body::before {
+        content: '?  \00a0\00a0\00a0  ? \00a0\00a0\00a0\00a0\00a0\00a0\00a0  ?  \00a0\00a0  ? \00a0\00a0\00a0\00a0\00a0  ? \00a0\00a0\00a0  ?  \00a0\00a0\00a0\00a0\00a0\00a0  ? \00a0  ?  \00a0\00a0\00a0\00a0  ? \00a0\00a0  ?';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        line-height: 60px;
+        font-family: 'Roboto', sans-serif;
+        font-size: 18px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.15);
+        pointer-events: none;
+        z-index: 9998;
+        overflow: hidden;
+        white-space: nowrap;
+        padding-left: 80px;
+        letter-spacing: 3px;
       }
 
       .root {
