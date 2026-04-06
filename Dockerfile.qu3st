@@ -49,8 +49,12 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 COPY --from=build --chown=1000:1000 /app .
-# Copy frontend UI from stock Lidarr
+# Copy frontend UI from stock Lidarr, then overlay Qu3st customizations
 COPY --from=stock --chown=1000:1000 /app/lidarr/bin/UI /app/UI
+COPY --chown=1000:1000 ui-overrides/index.html /app/UI/index.html
+COPY --chown=1000:1000 ui-overrides/Content/Images/logo.svg /app/UI/Content/Images/logo.svg
+COPY --chown=1000:1000 ui-overrides/170-3312fb9174d6649197c0.js /app/UI/170-3312fb9174d6649197c0.js
+COPY --chown=1000:1000 ui-overrides/Content/170-5fffb0b95668d3bbf139.css /app/UI/Content/170-5fffb0b95668d3bbf139.css
 
 ENV LIDARR_BRANCH=develop
 ENV LIDARR_INSTANCE_NAME="Lidarr [Qu3st]"
